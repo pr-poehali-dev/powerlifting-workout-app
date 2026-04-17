@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { Badge } from '@/components/ui/badge';
+import { api } from '@/lib/api';
+import type { AppUser } from './Index';
 
 const friends = [
   { name: 'Алексей М.', squat: 250, bench: 180, deadlift: 290, total: 720, category: '-93', avatar: 'A' },
@@ -30,11 +32,39 @@ const feed = [
   { user: 'Сергей В.', action: 'Достижение', detail: 'Wilks 300+ 💪', time: '1 день назад' },
 ];
 
-export default function ProfilePage() {
+interface ProfilePageProps {
+  user: AppUser;
+  onLogout: () => void;
+  onUserUpdate: (u: AppUser) => void;
+}
+
+export default function ProfilePage({ user, onLogout }: ProfilePageProps) {
   const [socialTab, setSocialTab] = useState<SocialTab>('compare');
   const [sortBy, setSortBy] = useState<'total' | 'squat' | 'bench' | 'deadlift'>('total');
+  const [profileData, setProfileData] = useState<{ records?: Record<string, number>; workouts_count?: number; total?: number } | null>(null);
 
-  const sorted = [...friends, { ...me, isMe: true }].sort((a, b) => b[sortBy] - a[sortBy]);
+  useEffect(() => {
+    api.profile.get().then(res => {
+      if (!res.error) setProfileData(res);
+    }).catch(() => {});
+  }, []);
+
+  const records = profileData?.records ?? {};
+  const myTotal = profileData?.total ?? 0;
+  const workoutsCount = profileData?.workouts_count ?? 0;
+
+  const meEntry = {
+    name: user.name,
+    squat: records['squat'] ?? 0,
+    bench: records['bench'] ?? 0,
+    deadlift: records['deadlift'] ?? 0,
+    total: myTotal,
+    category: user.weight_category ?? '-',
+    avatar: user.name[0] ?? 'Я',
+    isMe: true,
+  };
+
+  const sorted = [...friends, meEntry].sort((a, b) => b[sortBy] - a[sortBy]);
 
   return (
     <div className="slide-up pb-4">
@@ -42,28 +72,28 @@ export default function ProfilePage() {
       <div className="gradient-fire mx-4 mt-4 rounded-2xl p-5">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-black text-white">
-            {me.avatar}
+            {user.name[0]}
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-black text-white">Мой профиль</h2>
-            <p className="text-white/70 text-sm">Категория -{me.category} кг • Wilks {me.wilks}</p>
+            <h2 className="text-xl font-black text-white">{user.name}</h2>
+            <p className="text-white/70 text-sm">{user.email}</p>
           </div>
-          <button className="bg-white/20 rounded-xl p-2">
-            <Icon name="Settings" size={18} className="text-white" />
+          <button onClick={onLogout} className="bg-white/20 rounded-xl p-2">
+            <Icon name="LogOut" size={18} className="text-white" />
           </button>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-4">
           <div className="bg-white/10 rounded-xl p-2 text-center">
-            <div className="text-xl font-black text-white">{me.total}</div>
+            <div className="text-xl font-black text-white">{myTotal || '—'}</div>
             <div className="text-white/60 text-xs">кг сумма</div>
           </div>
           <div className="bg-white/10 rounded-xl p-2 text-center">
-            <div className="text-xl font-black text-white">{me.trainings}</div>
+            <div className="text-xl font-black text-white">{workoutsCount}</div>
             <div className="text-white/60 text-xs">тренировок</div>
           </div>
           <div className="bg-white/10 rounded-xl p-2 text-center">
-            <div className="text-xl font-black text-white">{me.streak}</div>
-            <div className="text-white/60 text-xs">🔥 дней подряд</div>
+            <div className="text-xl font-black text-white">{user.weight_category ?? '—'}</div>
+            <div className="text-white/60 text-xs">категория</div>
           </div>
         </div>
       </div>
@@ -73,9 +103,9 @@ export default function ProfilePage() {
         <h2 className="text-2xl text-foreground mb-3">Мои рекорды</h2>
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Присед', value: me.squat },
-            { label: 'Жим', value: me.bench },
-            { label: 'Тяга', value: me.deadlift },
+            { label: 'Присед', value: records['squat'] ?? '—' },
+            { label: 'Жим', value: records['bench'] ?? '—' },
+            { label: 'Тяга', value: records['deadlift'] ?? '—' },
           ].map((item) => (
             <div key={item.label} className="bg-card border border-border rounded-xl p-3 text-center">
               <div className="text-2xl font-black text-primary">{item.value}</div>

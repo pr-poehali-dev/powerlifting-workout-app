@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { Badge } from '@/components/ui/badge';
+import { api } from '@/lib/api';
+import type { AppUser } from './Index';
 
 const quotes = [
   'ЖИМ. ПРИСЕД. ТЯГА. ПОВТОРИ.',
@@ -30,8 +33,26 @@ const leaderboard = [
   { rank: 3, name: 'Ты', total: 500, category: '-93 кг', isMe: true },
 ];
 
-export default function HomePage() {
+interface HomePageProps {
+  user: AppUser;
+}
+
+export default function HomePage({ user }: HomePageProps) {
   const quote = quotes[Math.floor(Date.now() / 86400000) % quotes.length];
+  const [records, setRecords] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    api.records.getAll().then(res => {
+      if (res.bests) setRecords(res.bests);
+    }).catch(() => {});
+  }, []);
+
+  const liveStats = [
+    { label: 'Присед', value: records['squat'] ?? '—', unit: 'кг' },
+    { label: 'Жим', value: records['bench'] ?? '—', unit: 'кг' },
+    { label: 'Тяга', value: records['deadlift'] ?? '—', unit: 'кг' },
+    { label: 'Сумма', value: records['squat'] ? (Number(records['squat']) + Number(records['bench']) + Number(records['deadlift'])) : '—', unit: 'кг' },
+  ];
 
   return (
     <div className="slide-up space-y-4 pb-4">
@@ -40,7 +61,7 @@ export default function HomePage() {
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-2 right-4 text-8xl font-black text-white">⚡</div>
         </div>
-        <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Мотивация дня</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Привет, {user.name}!</p>
         <h1 className="text-3xl font-black text-white leading-tight">{quote}</h1>
         <div className="mt-4 flex items-center gap-2">
           <span className="pulse-dot inline-block w-2 h-2 rounded-full bg-white" />
@@ -52,7 +73,7 @@ export default function HomePage() {
       <div className="px-4">
         <h2 className="text-2xl text-foreground mb-3">Мои рекорды</h2>
         <div className="grid grid-cols-4 gap-2">
-          {stats.map((s) => (
+          {liveStats.map((s) => (
             <div key={s.label} className="bg-card border border-border rounded-xl p-3 text-center card-glow-hover transition-all">
               <div className="text-xl font-black text-primary leading-none">{s.value}</div>
               <div className="text-[10px] text-muted-foreground mt-0.5">{s.unit}</div>

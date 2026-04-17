@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
+import { api } from '@/lib/api';
+import type { AppUser } from './Index';
 
 const lifts = ['Присед', 'Жим', 'Тяга', 'Сумма'];
 
@@ -113,9 +115,84 @@ const achievements = [
   { icon: '🔥', title: 'Wilks 400+', date: '—', done: false },
 ];
 
-export default function ProgressPage() {
+function AddRecordForm({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [lift, setLift] = useState('squat');
+  const [weight, setWeight] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!weight) return;
+    setSaving(true);
+    await api.records.add(lift, Number(weight));
+    setSaving(false);
+    setWeight('');
+    setOpen(false);
+    onAdded();
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="w-full gradient-fire text-white font-black py-4 rounded-2xl text-sm tracking-wide flex items-center justify-center gap-2">
+        <Icon name="Plus" size={18} />
+        ДОБАВИТЬ РЕЗУЛЬТАТ
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+      <h3 className="font-black text-foreground">Новый результат</h3>
+      <select
+        value={lift}
+        onChange={e => setLift(e.target.value)}
+        className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
+      >
+        <option value="squat">Присед</option>
+        <option value="bench">Жим лёжа</option>
+        <option value="deadlift">Становая тяга</option>
+      </select>
+      <input
+        type="number"
+        value={weight}
+        onChange={e => setWeight(e.target.value)}
+        placeholder="Вес (кг)"
+        className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
+      />
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="flex-1 bg-muted border border-border text-muted-foreground font-bold py-3 rounded-xl text-sm">
+          Отмена
+        </button>
+        <button onClick={save} disabled={saving} className="flex-1 gradient-fire text-white font-black py-3 rounded-xl text-sm">
+          {saving ? 'Сохраняю...' : 'Сохранить'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface ProgressPageProps {
+  user: AppUser;
+}
+
+export default function ProgressPage({ user: _user }: ProgressPageProps) {
   const [selectedLift, setSelectedLift] = useState('Присед');
-  const points = data[selectedLift];
+  const [liveHistory, setLiveHistory] = useState<{ lift: string; weight: number; date: string }[]>([]);
+
+  useEffect(() => {
+    api.records.getAll().then(res => {
+      if (res.history) setLiveHistory(res.history);
+    }).catch(() => {});
+  }, []);
+
+  const liftKey: Record<string, string> = { 'Присед': 'squat', 'Жим': 'bench', 'Тяга': 'deadlift' };
+  const currentKey = liftKey[selectedLift];
+
+  const filteredHistory = currentKey
+    ? liveHistory.filter(r => r.lift === currentKey).map(r => ({ date: r.date.slice(5).replace('-', '.'), weight: r.weight }))
+    : [];
+
+  const points = filteredHistory.length >= 2 ? filteredHistory : data[selectedLift];
   const first = points[0].weight;
   const last = points[points.length - 1].weight;
   const gain = last - first;
@@ -201,10 +278,9 @@ export default function ProgressPage() {
         </div>
 
         {/* Add Record */}
-        <button className="w-full gradient-fire text-white font-black py-4 rounded-2xl text-sm tracking-wide flex items-center justify-center gap-2">
-          <Icon name="Plus" size={18} />
-          ДОБАВИТЬ РЕЗУЛЬТАТ
-        </button>
+        <AddRecordForm onAdded={() => {
+          api.records.getAll().then(res => { if (res.history) setLiveHistory(res.history); });
+        }} />
       </div>
     </div>
   );
